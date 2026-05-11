@@ -1,4 +1,4 @@
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -18,8 +18,15 @@ const formSchema = z.object({
 
 export default function CreateServer() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
-  
+
+  const params = new URLSearchParams(search);
+  const planFromUrl = params.get("plan");
+  const defaultPlan = ["free", "premium", "enterprise"].includes(planFromUrl ?? "")
+    ? (planFromUrl as "free" | "premium" | "enterprise")
+    : "free";
+
   const createServer = useCreateServer();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -28,7 +35,7 @@ export default function CreateServer() {
       name: "",
       software: "paper",
       version: "1.21.4",
-      plan: "free",
+      plan: defaultPlan,
     },
   });
 

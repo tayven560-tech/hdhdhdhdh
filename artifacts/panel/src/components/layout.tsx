@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
-import { Server, Activity, Plus } from "lucide-react";
+import { Server, Activity, Plus, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -26,6 +26,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Link href="/servers/new" className={cn("flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", location === "/servers/new" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")}>
             <Plus size={16} />
             Deploy Server
+          </Link>
+          <Link href="/plans" className={cn("flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors", location === "/plans" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")}>
+            <CreditCard size={16} />
+            Plans & Pricing
           </Link>
         </nav>
       </div>

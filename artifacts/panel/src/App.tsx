@@ -6,6 +6,7 @@ import { Layout } from "@/components/layout";
 import Dashboard from "@/pages/dashboard";
 import CreateServer from "@/pages/create-server";
 import ServerDetail from "@/pages/server-detail";
+import Plans from "@/pages/plans";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -24,6 +25,7 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/servers/new" component={CreateServer} />
         <Route path="/servers/:id" component={ServerDetail} />
+        <Route path="/plans" component={Plans} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -266,7 +266,7 @@ components:
           type: string
         plan:
           type: string
-          enum: [free, premium, enterprise]
+          enum: [free, starter, pro, enterprise]
         port:
           type: integer
         status:
@@ -300,7 +300,7 @@ components:
           enum: ["1.21.4", "1.20.4", "1.20.1", "1.19.4"]
         plan:
           type: string
-          enum: [free, premium, enterprise]
+          enum: [free, starter, pro, enterprise]
         maxPlayers:
           type: integer
 

@@ -22,7 +22,8 @@ export type ServerPlan = (typeof ServerPlan)[keyof typeof ServerPlan];
 
 export const ServerPlan = {
   free: "free",
-  premium: "premium",
+  starter: "starter",
+  pro: "pro",
   enterprise: "enterprise",
 } as const;
 
@@ -75,7 +76,8 @@ export type ServerInputPlan =
 
 export const ServerInputPlan = {
   free: "free",
-  premium: "premium",
+  starter: "starter",
+  pro: "pro",
   enterprise: "enterprise",
 } as const;
 

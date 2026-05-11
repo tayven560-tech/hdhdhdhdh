@@ -24,14 +24,16 @@ import { join, resolve, relative } from "path";
 const router = Router();
 
 const PLAN_MEMORY: Record<string, number> = {
-  free: 512,
-  premium: 5120,
-  enterprise: 10240,
+  free: 4096,
+  starter: 8192,
+  pro: 16384,
+  enterprise: 32768,
 };
 
 const PLAN_MAX_PLAYERS: Record<string, number> = {
-  free: 10,
-  premium: 100,
+  free: 20,
+  starter: 40,
+  pro: 100,
   enterprise: 500,
 };
 
@@ -39,7 +41,7 @@ const CreateServerBody = z.object({
   name: z.string().min(1).max(64),
   software: z.enum(["paper", "leaf", "fabric"]).default("paper"),
   version: z.enum(["1.21.4", "1.20.4", "1.20.1", "1.19.4"]),
-  plan: z.enum(["free", "premium", "enterprise"]),
+  plan: z.enum(["free", "starter", "pro", "enterprise"]),
   maxPlayers: z.number().int().optional(),
 });
 

@@ -11,6 +11,7 @@ export type ServerInputPlan =
 
 export const ServerInputPlan = {
   free: "free",
-  premium: "premium",
+  starter: "starter",
+  pro: "pro",
   enterprise: "enterprise",
 } as const;

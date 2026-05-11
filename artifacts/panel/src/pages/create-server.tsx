@@ -13,7 +13,7 @@ const formSchema = z.object({
   name: z.string().min(1, "Server name is required").max(64),
   software: z.enum(["paper", "leaf", "fabric"]),
   version: z.enum(["1.21.4", "1.20.4", "1.20.1", "1.19.4"]),
-  plan: z.enum(["free", "premium", "enterprise"]),
+  plan: z.enum(["free", "starter", "pro", "enterprise"]),
 });
 
 export default function CreateServer() {
@@ -23,8 +23,8 @@ export default function CreateServer() {
 
   const params = new URLSearchParams(search);
   const planFromUrl = params.get("plan");
-  const defaultPlan = ["free", "premium", "enterprise"].includes(planFromUrl ?? "")
-    ? (planFromUrl as "free" | "premium" | "enterprise")
+  const defaultPlan = ["free", "starter", "pro", "enterprise"].includes(planFromUrl ?? "")
+    ? (planFromUrl as "free" | "starter" | "pro" | "enterprise")
     : "free";
 
   const createServer = useCreateServer();
@@ -149,9 +149,10 @@ export default function CreateServer() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="free">Free (2GB RAM)</SelectItem>
-                        <SelectItem value="premium">Premium (8GB RAM)</SelectItem>
-                        <SelectItem value="enterprise">Enterprise (16GB RAM)</SelectItem>
+                        <SelectItem value="free">Free — 4GB RAM, 20 players</SelectItem>
+                        <SelectItem value="starter">Starter — 8GB RAM, 40 players ($3/mo)</SelectItem>
+                        <SelectItem value="pro">Pro — 16GB RAM, 100 players ($10/mo)</SelectItem>
+                        <SelectItem value="enterprise">Enterprise — 32GB RAM, unlimited ($25/mo)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>Higher plans unlock more player slots and better performance.</FormDescription>

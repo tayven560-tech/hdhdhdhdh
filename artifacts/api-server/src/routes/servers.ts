@@ -8,6 +8,7 @@ import {
   notifyServerStopped,
   notifyServerDeleted,
 } from "../lib/discord";
+import { requireAuth } from "../middlewares/requireAuth";
 import { z } from "zod";
 import multer from "multer";
 import {
@@ -72,6 +73,9 @@ async function nextPort(): Promise<number> {
   }
   throw new Error("No available ports");
 }
+
+// All server routes require authentication
+router.use("/servers", requireAuth);
 
 // ── Server CRUD ──────────────────────────────────────────────────────────────
 

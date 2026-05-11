@@ -144,11 +144,11 @@ export default function Dashboard() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Active Nodes</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Active Servers</h1>
           <p className="text-muted-foreground">Monitor and control your server fleet.</p>
         </div>
         <Button asChild>
-          <Link href="/servers/new">Deploy New Node</Link>
+          <Link href="/servers/new">Deploy New Server</Link>
         </Button>
       </div>
 
@@ -176,10 +176,10 @@ export default function Dashboard() {
       ) : !servers || servers.length === 0 ? (
         <div className="p-12 border border-border/50 border-dashed rounded-lg flex flex-col items-center justify-center text-center">
           <ServerIcon className="text-muted-foreground mb-4 opacity-50" size={48} />
-          <h3 className="text-xl font-medium mb-1">No Active Nodes</h3>
+          <h3 className="text-xl font-medium mb-1">No Active Servers</h3>
           <p className="text-muted-foreground mb-6">Your fleet is empty. Deploy a new server to get started.</p>
           <Button asChild>
-            <Link href="/servers/new">Deploy First Node</Link>
+            <Link href="/servers/new">Deploy First Server</Link>
           </Button>
         </div>
       ) : (

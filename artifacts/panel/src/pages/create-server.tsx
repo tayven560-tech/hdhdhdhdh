@@ -43,7 +43,7 @@ export default function CreateServer() {
     createServer.mutate({ data: values }, {
       onSuccess: (server) => {
         toast({
-          title: "Node deployed",
+          title: "Server deployed",
           description: `Server ${server.name} is provisioning.`,
         });
         setLocation(`/servers/${server.id}`);
@@ -51,7 +51,7 @@ export default function CreateServer() {
       onError: () => {
         toast({
           title: "Deployment failed",
-          description: "An error occurred while provisioning the node.",
+          description: "An error occurred while provisioning the server.",
           variant: "destructive",
         });
       }
@@ -61,14 +61,14 @@ export default function CreateServer() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Deploy New Node</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Deploy New Server</h1>
         <p className="text-muted-foreground">Provision a new Minecraft server instance.</p>
       </div>
 
       <Card className="border-border/50">
         <CardHeader>
           <CardTitle>Instance Configuration</CardTitle>
-          <CardDescription>Select the software and resources for your new node.</CardDescription>
+          <CardDescription>Select the software and resources for your new server.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>

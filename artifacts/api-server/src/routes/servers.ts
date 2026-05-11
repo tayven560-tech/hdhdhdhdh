@@ -1,13 +1,8 @@
 import { Router } from "express";
 import { db, serversTable, serverMetricsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
+import { getAuth } from "@clerk/express";
 import * as mc from "../mc/manager";
-import {
-  notifyServerCreated,
-  notifyServerStarted,
-  notifyServerStopped,
-  notifyServerDeleted,
-} from "../lib/discord";
 import { requireAuth } from "../middlewares/requireAuth";
 import { z } from "zod";
 import multer from "multer";
@@ -21,6 +16,7 @@ import {
   createWriteStream,
 } from "fs";
 import { join, resolve, relative } from "path";
+import type { Request, Response } from "express";
 
 const router = Router();
 
@@ -74,17 +70,44 @@ async function nextPort(): Promise<number> {
   throw new Error("No available ports");
 }
 
+async function requireOwnership(
+  req: Request,
+  res: Response,
+  id: number,
+  userId: string,
+): Promise<typeof serversTable.$inferSelect | null> {
+  const [row] = await db
+    .select()
+    .from(serversTable)
+    .where(and(eq(serversTable.id, id), eq(serversTable.userId, userId)));
+  if (!row) {
+    res.status(404).json({ error: "Server not found" });
+    return null;
+  }
+  return row;
+}
+
 // All server routes require authentication
 router.use("/servers", requireAuth);
 
 // ── Server CRUD ──────────────────────────────────────────────────────────────
 
-router.get("/servers", async (_req, res) => {
-  const rows = await db.select().from(serversTable).orderBy(desc(serversTable.createdAt));
+router.get("/servers", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const rows = await db
+    .select()
+    .from(serversTable)
+    .where(eq(serversTable.userId, userId))
+    .orderBy(desc(serversTable.createdAt));
   res.json(rows.map(toDto));
 });
 
 router.post("/servers", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const parsed = CreateServerBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -97,36 +120,40 @@ router.post("/servers", async (req, res) => {
 
   const [row] = await db
     .insert(serversTable)
-    .values({ name, software, version, plan, port, memoryMb, maxPlayers: defaultMaxPlayers, status: "stopped" })
+    .values({ userId, name, software, version, plan, port, memoryMb, maxPlayers: defaultMaxPlayers, status: "stopped" })
     .returning();
 
   mc.prepareServer(row!.id, software, version).catch((err) => {
     req.log.error({ err, id: row!.id }, "Error preparing server JAR");
   });
 
-  notifyServerCreated(row!.name, row!.id, version, plan).catch(() => {});
-
   res.status(201).json(toDto(row!));
 });
 
 router.get("/servers/:id", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [row] = await db.select().from(serversTable).where(eq(serversTable.id, id));
-  if (!row) { res.status(404).json({ error: "Server not found" }); return; }
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
   res.json(toDto(row));
 });
 
 router.delete("/servers/:id", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [row] = await db.select().from(serversTable).where(eq(serversTable.id, id));
-  mc.stopServer(id);
-  await db.delete(serversTable).where(eq(serversTable.id, id));
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
 
-  if (row) notifyServerDeleted(row.name, row.id).catch(() => {});
+  mc.stopServer(id);
+  await db.delete(serversTable).where(and(eq(serversTable.id, id), eq(serversTable.userId, userId)));
 
   res.status(204).end();
 });
@@ -134,18 +161,20 @@ router.delete("/servers/:id", async (req, res) => {
 // ── Server Actions ────────────────────────────────────────────────────────────
 
 router.post("/servers/:id/start", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [row] = await db.select().from(serversTable).where(eq(serversTable.id, id));
-  if (!row) { res.status(404).json({ error: "Server not found" }); return; }
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
   if (mc.isRunning(row.id)) { res.status(400).json({ error: "Already running" }); return; }
 
   await db.update(serversTable).set({ status: "starting", startedAt: new Date() }).where(eq(serversTable.id, row.id));
 
   mc.startServer(row.id, row.name, row.software, row.version, row.memoryMb, row.port).then(() => {
     db.update(serversTable).set({ status: "running" }).where(eq(serversTable.id, row.id)).catch(() => {});
-    notifyServerStarted(row.name, row.id, row.port).catch(() => {});
   }).catch((err) => {
     req.log.error({ err, id: row.id }, "Failed to start server");
     db.update(serversTable).set({ status: "stopped" }).where(eq(serversTable.id, row.id)).catch(() => {});
@@ -156,33 +185,36 @@ router.post("/servers/:id/start", async (req, res) => {
 });
 
 router.post("/servers/:id/stop", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [row] = await db.select().from(serversTable).where(eq(serversTable.id, id));
-  if (!row) { res.status(404).json({ error: "Server not found" }); return; }
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
 
   mc.stopServer(row.id);
   await db.update(serversTable).set({ status: "stopped", pid: null }).where(eq(serversTable.id, row.id));
-  notifyServerStopped(row.name, row.id).catch(() => {});
 
   const [updated] = await db.select().from(serversTable).where(eq(serversTable.id, row.id));
   res.json(toDto(updated!));
 });
 
 router.post("/servers/:id/restart", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [row] = await db.select().from(serversTable).where(eq(serversTable.id, id));
-  if (!row) { res.status(404).json({ error: "Server not found" }); return; }
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
 
   mc.stopServer(row.id);
   await db.update(serversTable).set({ status: "starting" }).where(eq(serversTable.id, row.id));
   setTimeout(() => {
-    mc.startServer(row.id, row.name, row.software, row.version, row.memoryMb, row.port).then(() => {
-      notifyServerStarted(row.name, row.id, row.port).catch(() => {});
-    }).catch((err) => {
+    mc.startServer(row.id, row.name, row.software, row.version, row.memoryMb, row.port).catch((err) => {
       req.log.error({ err }, "Restart failed");
     });
   }, 3000);
@@ -192,8 +224,14 @@ router.post("/servers/:id/restart", async (req, res) => {
 });
 
 router.post("/servers/:id/command", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
 
   const parsed = CommandBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
@@ -204,16 +242,28 @@ router.post("/servers/:id/command", async (req, res) => {
 });
 
 router.get("/servers/:id/logs", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
 
   const lines = mc.getLogs(id);
   res.json(lines.map((line, i) => ({ id: i, line, timestamp: new Date().toISOString() })));
 });
 
 router.get("/servers/:id/metrics", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
 
   const rows = await db
     .select()
@@ -240,8 +290,14 @@ function safeServerPath(serverId: number, subPath: string): string | null {
 }
 
 router.get("/servers/:id/files", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
 
   const subPath = (typeof req.query.path === "string" ? req.query.path : ".") || ".";
   const target = safeServerPath(id, subPath);
@@ -287,9 +343,15 @@ const upload = multer({
 });
 
 router.post("/servers/:id/files/upload", upload.single("file"), async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
+
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
 
   const subPath = (typeof req.query.path === "string" ? req.query.path : ".") || ".";
   const target = safeServerPath(id, subPath);
@@ -319,15 +381,19 @@ router.post("/servers/:id/files/upload", upload.single("file"), async (req, res)
 });
 
 router.post("/servers/:id/mods/install", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
 
   const { versionId } = req.body as { versionId?: string };
   if (!versionId) { res.status(400).json({ error: "versionId is required" }); return; }
 
-  const serverRows = await db.select().from(serversTable).where(eq(serversTable.id, id)).limit(1);
-  if (!serverRows[0]) { res.status(404).json({ error: "Server not found" }); return; }
-  const software = serverRows[0].software ?? "paper";
+  const software = row.software ?? "paper";
 
   const versionRes = await fetch(`https://api.modrinth.com/v2/version/${versionId}`, {
     headers: { "User-Agent": "VortexHosting/1.0 (vortex-hosting)" },
@@ -368,8 +434,14 @@ router.post("/servers/:id/mods/install", async (req, res) => {
 });
 
 router.post("/servers/:id/files/delete", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const row = await requireOwnership(req, res, id, userId);
+  if (!row) return;
 
   const { path: filePath } = req.body as { path?: string };
   if (!filePath) { res.status(400).json({ error: "path is required" }); return; }

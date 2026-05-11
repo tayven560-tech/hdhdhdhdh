@@ -5,7 +5,6 @@ import { logger } from "../lib/logger";
 import type { IncomingMessage } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { db, serverMetricsTable } from "@workspace/db";
-import { notifyServerCrashed } from "../lib/discord";
 
 const SERVERS_DIR = join(process.cwd(), "mc-servers");
 
@@ -310,16 +309,12 @@ export async function startServer(
     logger.info({ id, code }, "Server process exited");
     clearInterval(running.get(id)?.metricsInterval);
     running.delete(id);
-    if (code !== null && code !== 0) {
-      notifyServerCrashed(name, id, code).catch(() => {});
-    }
   });
 
   proc.on("error", (err) => {
     logger.error({ id, err }, "Server process error");
     clearInterval(running.get(id)?.metricsInterval);
     running.delete(id);
-    notifyServerCrashed(name, id, null).catch(() => {});
   });
 
   logger.info({ id, port, memoryMb, software }, "Started Minecraft server");

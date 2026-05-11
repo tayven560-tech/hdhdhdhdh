@@ -84,62 +84,15 @@ export function notifyWebsiteUpdated() {
   });
 }
 
-export function notifyServerCreated(name: string, id: number, version: string, plan: string) {
+export function notifyNewVersionAvailable(software: string, version: string, releaseUrl: string) {
   return notify({
-    title: "New server deployed",
+    title: `🆕 New ${software} version available`,
+    description: `A new version of **${software}** has been released.`,
     color: "info",
     fields: [
-      { name: "Name", value: name, inline: true },
-      { name: "ID", value: String(id), inline: true },
       { name: "Version", value: version, inline: true },
-      { name: "Plan", value: plan, inline: true },
-    ],
-  });
-}
-
-export function notifyServerStarted(name: string, id: number, port: number) {
-  return notify({
-    title: "Server started",
-    color: "online",
-    fields: [
-      { name: "Name", value: name, inline: true },
-      { name: "ID", value: String(id), inline: true },
-      { name: "Port", value: String(port), inline: true },
-    ],
-  });
-}
-
-export function notifyServerStopped(name: string, id: number) {
-  return notify({
-    title: "Server stopped",
-    color: "offline",
-    fields: [
-      { name: "Name", value: name, inline: true },
-      { name: "ID", value: String(id), inline: true },
-    ],
-  });
-}
-
-export function notifyServerCrashed(name: string, id: number, exitCode: number | null) {
-  return notify({
-    title: "Server crashed",
-    description: "A Minecraft server exited unexpectedly.",
-    color: "danger",
-    fields: [
-      { name: "Name", value: name, inline: true },
-      { name: "ID", value: String(id), inline: true },
-      { name: "Exit code", value: String(exitCode ?? "unknown"), inline: true },
-    ],
-  });
-}
-
-export function notifyServerDeleted(name: string, id: number) {
-  return notify({
-    title: "Server deleted",
-    color: "warning",
-    fields: [
-      { name: "Name", value: name, inline: true },
-      { name: "ID", value: String(id), inline: true },
+      { name: "Software", value: software, inline: true },
+      { name: "Release", value: releaseUrl, inline: false },
     ],
   });
 }

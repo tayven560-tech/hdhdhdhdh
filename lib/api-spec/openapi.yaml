@@ -3,13 +3,16 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Vortex Hosting — Minecraft server management API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: servers
+    description: Minecraft server management
+
 paths:
   /healthz:
     get:
@@ -24,13 +27,317 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /servers:
+    get:
+      operationId: listServers
+      tags: [servers]
+      summary: List all servers
+      responses:
+        "200":
+          description: List of servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Server"
+
+    post:
+      operationId: createServer
+      tags: [servers]
+      summary: Create a new Minecraft server
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServerInput"
+      responses:
+        "201":
+          description: Server created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /servers/{id}:
+    get:
+      operationId: getServer
+      tags: [servers]
+      summary: Get a server by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Server details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+    delete:
+      operationId: deleteServer
+      tags: [servers]
+      summary: Delete a server
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /servers/{id}/start:
+    post:
+      operationId: startServer
+      tags: [servers]
+      summary: Start a Minecraft server
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "400":
+          description: Already running or error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /servers/{id}/stop:
+    post:
+      operationId: stopServer
+      tags: [servers]
+      summary: Stop a Minecraft server
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+
+  /servers/{id}/restart:
+    post:
+      operationId: restartServer
+      tags: [servers]
+      summary: Restart a Minecraft server
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Restarting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+
+  /servers/{id}/command:
+    post:
+      operationId: sendCommand
+      tags: [servers]
+      summary: Send a console command to a running server
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandInput"
+      responses:
+        "200":
+          description: Command sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "400":
+          description: Server not running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /servers/{id}/logs:
+    get:
+      operationId: getServerLogs
+      tags: [servers]
+      summary: Get recent console logs for a server (last 200 lines)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Log lines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogLine"
+
+  /servers/{id}/metrics:
+    get:
+      operationId: getServerMetrics
+      tags: [servers]
+      summary: Get player count history for a server (last 60 data points)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Metric snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MetricPoint"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    Server:
+      type: object
+      required: [id, name, software, version, plan, port, status, memoryMb, maxPlayers, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        software:
+          type: string
+          enum: [paper, leaf, fabric]
+        version:
+          type: string
+        plan:
+          type: string
+          enum: [free, premium, enterprise]
+        port:
+          type: integer
+        status:
+          type: string
+          enum: [stopped, starting, running, stopping]
+        memoryMb:
+          type: integer
+        maxPlayers:
+          type: integer
+        playerCount:
+          type: integer
+        uptimeSeconds:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    ServerInput:
+      type: object
+      required: [name, version, plan]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        software:
+          type: string
+          enum: [paper, leaf, fabric]
+          default: paper
+        version:
+          type: string
+          enum: ["1.21.4", "1.20.4", "1.20.1", "1.19.4"]
+        plan:
+          type: string
+          enum: [free, premium, enterprise]
+        maxPlayers:
+          type: integer
+
+    CommandInput:
+      type: object
+      required: [command]
+      properties:
+        command:
+          type: string
+
+    LogLine:
+      type: object
+      required: [id, line, timestamp]
+      properties:
+        id:
+          type: integer
+        line:
+          type: string
+        timestamp:
+          type: string
+
+    MetricPoint:
+      type: object
+      required: [id, playerCount, uptimeSeconds, recordedAt]
+      properties:
+        id:
+          type: integer
+        playerCount:
+          type: integer
+        uptimeSeconds:
+          type: integer
+        recordedAt:
+          type: string
+
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
